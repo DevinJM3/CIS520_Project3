@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include "block_store.h"
 
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+
 // The object is opaque, so we can't really test things directly....
 
 unsigned int score;
