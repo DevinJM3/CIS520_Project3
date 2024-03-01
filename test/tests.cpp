@@ -51,7 +51,7 @@ TEST(block_store_destroy, null_pointer) {
 
 
 TEST(block_store_get_total_blocks, num_blocks) {
-    ASSERT_EQ(BLOCK_STORE_AVAIL_BLOCKS, block_store_get_total_blocks());
+    ASSERT_EQ(BLOCK_STORE_NUM_BLOCKS, block_store_get_total_blocks());
     score += 2;
 }
 
@@ -62,14 +62,21 @@ TEST(block_store_alloc_free_req, allocate_null) {
     score += 2;
 }
 
-// Nothing should have been allocated yet.
+// Nothing should have been allocated yet, except the block for the bitmap
 TEST(block_store_alloc_free_req, allocate_first) {
     block_store_t *bs = NULL;
     bs = block_store_create();
     ASSERT_NE(nullptr, bs) << "block_store_create returned NULL when it should not have\n";
     size_t id = 100;
     id = block_store_allocate(bs);
-    ASSERT_EQ(0, id) << "The id returned should be zero; this should be the first allocation.\n";
+    if (0==BITMAP_START_BLOCK)
+    {
+        ASSERT_EQ(BITMAP_NUM_BLOCKS, id) << "The id returned should be the block after the BITMAP; this should be the first allocation.\n";
+    }
+    else
+    {
+        ASSERT_EQ(0, id) << "The id returned should be zero; this should be the first allocation.\n";
+    }
     block_store_destroy(bs);
     score += 5;
 }
@@ -80,10 +87,24 @@ TEST(block_store_alloc_free_req, allocate_and_free) {
     ASSERT_NE(nullptr, bs) << "block_store_create returned NULL when it should not have\n";
     size_t id = 100;
     id = block_store_allocate(bs);
-    ASSERT_EQ(0, id) << "The id returned should be zero; this should be the first allocation.\n";
+    if (0==BITMAP_START_BLOCK)
+    {
+        ASSERT_EQ(BITMAP_NUM_BLOCKS, id) << "The id returned should be the block after the BITMAP; this should be the first allocation.\n";
+    }
+    else
+    {
+        ASSERT_EQ(0, id) << "The id returned should be zero; this should be the first allocation.\n";
+    }
     block_store_release(bs, id);
     id = block_store_allocate(bs);
-    ASSERT_EQ(0, id) << "The id returned should again be zero; did your release not work?\n";
+    if (0==BITMAP_START_BLOCK)
+    {
+        ASSERT_EQ(BITMAP_NUM_BLOCKS, id) << "The id returned should again be the block after the BITMAP; did your release not work?\n";
+    }
+    else
+    {
+        ASSERT_EQ(0, id) << "The id returned should again be zero; did your release not work?\n";
+    }
     block_store_destroy(bs);
 
     score += 5;
@@ -95,9 +116,13 @@ TEST(block_store_alloc_free_req, over_allocate) {
     ASSERT_NE(nullptr, bs) << "block_store_create returned NULL when it should not have\n";
 
     size_t id = 100;
-    for (size_t i = 0; i < BLOCK_STORE_AVAIL_BLOCKS; i++) {
-        id = block_store_allocate(bs);
-        ASSERT_EQ(i, id);
+    for (size_t i = 0; i < BLOCK_STORE_NUM_BLOCKS; i++) 
+    {
+        if ((i>=BITMAP_START_BLOCK+BITMAP_NUM_BLOCKS) || ((int)i<BITMAP_START_BLOCK))
+        {
+            id = block_store_allocate(bs);
+            ASSERT_EQ(i, id);
+        }
     }
 
     // Allocate once more. This should fail.
@@ -146,7 +171,7 @@ TEST(block_store_alloc_free_req, request_bad_500) {
     bs = block_store_create();
     ASSERT_NE(nullptr, bs) << "block_store_create returned NULL when it should not have\n";
 
-    size_t id = 500;
+    size_t id = 5000;
     bool success = false;
     success = block_store_request(bs, id);
     ASSERT_EQ(false, success);
@@ -180,13 +205,14 @@ TEST(block_store, count_free_and_used) {
     bool success = false;
     success = block_store_request(bs, id);
     ASSERT_EQ(true, success);
-    ASSERT_EQ(1, block_store_get_used_blocks(bs));
-    ASSERT_EQ(BLOCK_STORE_AVAIL_BLOCKS - 1, block_store_get_free_blocks(bs));
+    // We should have BITMAP_NUM_BLOCKS for the bitmap and 1 that we just requested
+    ASSERT_EQ(BITMAP_NUM_BLOCKS+1, block_store_get_used_blocks(bs));
+    ASSERT_EQ(BLOCK_STORE_NUM_BLOCKS - 1 - BITMAP_NUM_BLOCKS, block_store_get_free_blocks(bs));
 
     // request a different arbitrary block, and used and free should update accordingly.
     block_store_request(bs, 50);
-    ASSERT_EQ(2, block_store_get_used_blocks(bs));
-    ASSERT_EQ(BLOCK_STORE_AVAIL_BLOCKS - 2, block_store_get_free_blocks(bs));
+    ASSERT_EQ(BITMAP_NUM_BLOCKS+2, block_store_get_used_blocks(bs));
+    ASSERT_EQ(BLOCK_STORE_NUM_BLOCKS - 2 - BITMAP_NUM_BLOCKS, block_store_get_free_blocks(bs));
 
     block_store_destroy(bs);
     score += 5;
@@ -332,7 +358,7 @@ TEST(block_store_serialize, valid_serialize)
     uint8_t *write_buffer = (uint8_t *) calloc(1, BLOCK_SIZE_BYTES);
     // ASSERT will lead to seg fault, but better than leak I guess?
     ASSERT_NE(nullptr, write_buffer) << "calloc ... failed?" << std::endl;
-    memset(write_buffer, '~', 100);
+    memset(write_buffer, '~', BLOCK_SIZE_BYTES);
     size_t bytesWritten;
     bytesWritten = block_store_write(bs, id, write_buffer);
     ASSERT_EQ(bytesWritten, BLOCK_SIZE_BYTES);
@@ -434,7 +460,6 @@ TEST(block_store_deserialize, valid_deserialize)
     memset(write_buffer, 'J', 10);
     memset(write_buffer+10, 'i', 10);
     memset(write_buffer+20, 'm', 10);
-    memset(write_buffer+30, 'R', 10);
     size_t bytesWritten;
     bytesWritten = block_store_write(bsWrite, id, write_buffer);
     ASSERT_EQ(bytesWritten, BLOCK_SIZE_BYTES);
@@ -448,7 +473,6 @@ TEST(block_store_deserialize, valid_deserialize)
     // to the read
     //free(write_buffer);
     block_store_destroy(bsWrite);
-
 
     block_store_t *bsRead = NULL;
 
@@ -474,7 +498,6 @@ TEST(block_store_deserialize, valid_deserialize)
     free(read_buffer);
     free(write_buffer);
     block_store_destroy(bsRead);
-
     score += 12;
 }
 
