@@ -24,7 +24,6 @@ void block_store_destroy(block_store_t *const bs)
     if(!bs && !bs->bitmap){
         bitmap_destroy(bs->bitmap);
         free(bs);
-        bs->bitmap = NULL;
     }
 }
 
