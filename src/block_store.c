@@ -8,9 +8,29 @@
 // remove it before you submit. Just allows things to compile initially.
 #define UNUSED(x) (void)(x)
 
+struct block_store{
+    bitmap_t *bitmap; //tracks blocks in use
+    uint8_t blocks[BLOCK_STORE_NUM_BLOCKS][BLOCK_SIZE_BYTES] //storage for the block data
+};
+
 block_store_t *block_store_create()
 {
-    return NULL;
+    //allocating mem for the struct
+    block_store_t *bs = (block_store_t *)malloc(BLOCK_SIZE_BITS);
+    //null check
+    if(!bs){
+        return NULL;
+    }
+
+    //initializing bitmap
+    bs->bitmap = bitmap_create(BLOCK_STORE_NUM_BLOCKS);
+    //if it fails...
+    if(!bs->bitmap){
+        free(bs);
+        return NULL;
+    }
+
+    return bs;
 }
 
 void block_store_destroy(block_store_t *const bs)
