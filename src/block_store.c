@@ -8,15 +8,27 @@
 // remove it before you submit. Just allows things to compile initially.
 #define UNUSED(x) (void)(x)
 
+typedef struct block_store{
+    bitmap_t *bitmap;
+    uint8_t data[BLOCK_SIZE_BYTES][BLOCK_STORE_NUM_BLOCKS];
+}block_store_t;
+
 block_store_t *block_store_create()
 {
     return NULL;
 }
 
+
 void block_store_destroy(block_store_t *const bs)
 {
-    UNUSED(bs);
+    if(!bs && !bs->bitmap){
+        bitmap_destroy(bs->bitmap);
+        free(bs);
+        bs->bitmap = NULL;
+    }
 }
+
+
 size_t block_store_allocate(block_store_t *const bs)
 {
     UNUSED(bs);
