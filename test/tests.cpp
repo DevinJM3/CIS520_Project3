@@ -118,7 +118,7 @@ TEST(block_store_alloc_free_req, over_allocate) {
     size_t id = 100;
     for (size_t i = 0; i < BLOCK_STORE_NUM_BLOCKS; i++) 
     {
-        if ((i>=BITMAP_START_BLOCK+BITMAP_NUM_BLOCKS) || ((int)i<BITMAP_START_BLOCK))
+        if (i != BITMAP_START_BLOCK)
         {
             id = block_store_allocate(bs);
             ASSERT_EQ(i, id);
