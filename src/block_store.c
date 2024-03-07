@@ -19,13 +19,18 @@ block_store_t *block_store_create()
     if(bs == NULL)
         return NULL;
 
-    bs->bitmap = bitmap_overlay(BLOCK_SIZE_BYTES * 8,  bs->data[BITMAP_START_BLOCK]);
+    bs->bitmap = bitmap_overlay(BITMAP_SIZE_BYTES * 8,  bs->data[BITMAP_START_BLOCK]);
     if(bs->bitmap == NULL){
         free(bs);
         return NULL;
     }
-    
-    return (block_store_t*)bs;
+
+    if(block_store_request((block_store_t*)bs, BITMAP_START_BLOCK))   // If it can allocate the start block
+        return (block_store_t*)bs;
+    else{                                           // Unable to allocate the start block
+        block_store_destroy((block_store_t*)bs); 
+        return NULL;
+    }
 }
 
 void block_store_destroy(block_store_t *const bs)
@@ -38,21 +43,37 @@ void block_store_destroy(block_store_t *const bs)
 }
 size_t block_store_allocate(block_store_t *const bs)
 {
-    UNUSED(bs);
-    return 0;
+    if(bs == NULL)
+        return SIZE_MAX;
+
+    size_t available_index = bitmap_ffz(((block_store*)bs)->bitmap);    // Get the index of the next available block
+    if(available_index == SIZE_MAX)
+        return SIZE_MAX;
+    
+    if(block_store_request(bs, available_index))
+        return available_index; // Index of newly allocated block
+    else
+        return SIZE_MAX;        // No more blocks left to allocate
 }
 
 bool block_store_request(block_store_t *const bs, const size_t block_id)
 {
-    UNUSED(bs);
-    UNUSED(block_id);
-    return false;
+    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS)     // If the block_store is invalid or the id is bigger than the max size
+        return false;
+
+    if(bitmap_test(((block_store*)bs)->bitmap, block_id))   // If the index block_id has been set in the bitmap (already allocated)
+        return false;
+    
+    bitmap_set(((block_store*)bs)->bitmap, block_id);                       // Set the block_id bitmap
+    return bitmap_test(((block_store*)bs)->bitmap, BITMAP_START_BLOCK);     // Return true if it was successfull, else false
 }
 
 void block_store_release(block_store_t *const bs, const size_t block_id)
 {
-    UNUSED(bs);
-    UNUSED(block_id);
+    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS)
+        return;
+    
+    bitmap_reset(((block_store*)bs)->bitmap, block_id);
 }
 
 size_t block_store_get_used_blocks(const block_store_t *const bs)
@@ -69,7 +90,7 @@ size_t block_store_get_free_blocks(const block_store_t *const bs)
 
 size_t block_store_get_total_blocks()
 {
-    return 0;
+    return BLOCK_STORE_NUM_BLOCKS;
 }
 
 size_t block_store_read(const block_store_t *const bs, const size_t block_id, void *buffer)
