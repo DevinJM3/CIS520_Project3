@@ -41,6 +41,7 @@ void block_store_destroy(block_store_t *const bs)
     bitmap_destroy(((block_store*)bs)->bitmap); // Free the bitmap
     free(bs);                                   // Free the block_store
 }
+
 size_t block_store_allocate(block_store_t *const bs)
 {
     if(bs == NULL)
@@ -78,14 +79,18 @@ void block_store_release(block_store_t *const bs, const size_t block_id)
 
 size_t block_store_get_used_blocks(const block_store_t *const bs)
 {
-    UNUSED(bs);
-    return 0;
+    if(bs == NULL)
+        return SIZE_MAX;
+
+    return bitmap_total_set(((block_store*)bs)->bitmap);
 }
 
 size_t block_store_get_free_blocks(const block_store_t *const bs)
 {
-    UNUSED(bs);
-    return 0;
+    if(bs == NULL)
+        return SIZE_MAX;
+    
+    return BLOCK_STORE_NUM_BLOCKS - bitmap_total_set(((block_store*)bs)->bitmap);
 }
 
 size_t block_store_get_total_blocks()
