@@ -109,22 +109,31 @@ size_t block_store_get_total_blocks()
 
 size_t block_store_read(const block_store_t *const bs, const size_t block_id, void *buffer)
 {
-    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS)
-        return SIZE_MAX;
+    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS || buffer == NULL)   // If the parameters are invalid
+        return 0;
 
-    UNUSED(buffer);
-    return 0;
+    if(!bitmap_test(((block_store*)bs)->bitmap, block_id))                  // If the block has not already been allocated
+        return 0;
+
+    for(size_t i = 0; i < BLOCK_SIZE_BYTES; i++)                            // Iterate over all bytes at the index block_id
+        ((char*)buffer)[i] = ((block_store*)bs)->data[block_id][i];         // Copy the data from the bs->data to the buffer
+
+    return BLOCK_SIZE_BYTES;                                                // Return the number of bytes copied
 }
 
 size_t block_store_write(block_store_t *const bs, const size_t block_id, const void *buffer)
 {
-    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS)
+    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS || buffer == NULL)   // If the parameters are invalid
         return 0;
-        
-    UNUSED(bs);
-    UNUSED(block_id);
-    UNUSED(buffer);
-    return 0;
+    
+    if(!bitmap_test(((block_store*)bs)->bitmap, block_id))                  // If the block has not already been allocated
+        return 0;
+
+    for(size_t i = 0; i < BLOCK_SIZE_BYTES; i++)                            // Iterate over the maxiumum number of bytes that can be stored in bs->data
+        ((block_store*)bs)->data[block_id][i] = ((char*)buffer)[i];         // Copy the data from buffer to bs->data
+    
+
+    return BLOCK_SIZE_BYTES;                                                // Return the number of bytes copied
 }
 
 block_store_t *block_store_deserialize(const char *const filename)
