@@ -19,15 +19,24 @@ block_store_t *block_store_create()
     if(bs == NULL)
         return NULL;
 
-    bs->bitmap = bitmap_overlay(BITMAP_SIZE_BYTES * 8,  bs->data[BITMAP_START_BLOCK]);
-    if(bs->bitmap == NULL){
+    bs->bitmap = bitmap_overlay(BITMAP_SIZE_BYTES * 8,  bs->data[BITMAP_START_BLOCK]);      // Overlay the bitmap on the data array starting at BITMAP_START_BLOCK
+    if(bs->bitmap == NULL){                                                                 // If the bitmap was unable to be overlayed onto the array
         free(bs);
         return NULL;
     }
 
-    if(block_store_request((block_store_t*)bs, BITMAP_START_BLOCK))   // If it can allocate the start block
+
+    bool allocation_successful = true;
+    for(size_t i = BITMAP_START_BLOCK; i < BITMAP_START_BLOCK + BITMAP_NUM_BLOCKS; i++){    // Iterate over the blocks needed to store the bitmap
+        if(!block_store_request((block_store_t*)bs, i)){                                    // If it is unable to allocate the next block for the bitmap
+            allocation_successful = false;                                                  // Set allocation_successful to false and move on to the if statement below
+            break;
+        }
+    }
+
+    if(allocation_successful)           // If it can allocate the start block
         return (block_store_t*)bs;
-    else{                                           // Unable to allocate the start block
+    else{                               // Unable to allocate the start block
         block_store_destroy((block_store_t*)bs); 
         return NULL;
     }
@@ -100,14 +109,18 @@ size_t block_store_get_total_blocks()
 
 size_t block_store_read(const block_store_t *const bs, const size_t block_id, void *buffer)
 {
-    UNUSED(bs);
-    UNUSED(block_id);
+    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS)
+        return SIZE_MAX;
+
     UNUSED(buffer);
     return 0;
 }
 
 size_t block_store_write(block_store_t *const bs, const size_t block_id, const void *buffer)
 {
+    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS)
+        return 0;
+        
     UNUSED(bs);
     UNUSED(block_id);
     UNUSED(buffer);
@@ -115,13 +128,19 @@ size_t block_store_write(block_store_t *const bs, const size_t block_id, const v
 }
 
 block_store_t *block_store_deserialize(const char *const filename)
-{
+{  
+    if(filename == NULL)
+        return NULL;
+
     UNUSED(filename);
     return NULL;
 }
 
 size_t block_store_serialize(const block_store_t *const bs, const char *const filename)
 {
+    if(bs == NULL || filename == NULL)
+        return 0;
+
     UNUSED(bs);
     UNUSED(filename);
     return 0;

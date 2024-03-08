@@ -118,7 +118,7 @@ TEST(block_store_alloc_free_req, over_allocate) {
     size_t id = 100;
     for (size_t i = 0; i < BLOCK_STORE_NUM_BLOCKS; i++) 
     {
-        if (i != BITMAP_START_BLOCK)
+        if ((i>=BITMAP_START_BLOCK+BITMAP_NUM_BLOCKS) || ((int)i<BITMAP_START_BLOCK))
         {
             id = block_store_allocate(bs);
             ASSERT_EQ(i, id);
@@ -206,13 +206,13 @@ TEST(block_store, count_free_and_used) {
     success = block_store_request(bs, id);
     ASSERT_EQ(true, success);
     // We should have BITMAP_NUM_BLOCKS for the bitmap and 1 that we just requested
-    ASSERT_EQ(2, block_store_get_used_blocks(bs));
-    ASSERT_EQ(BLOCK_STORE_NUM_BLOCKS - 2, block_store_get_free_blocks(bs));
+    ASSERT_EQ(BITMAP_NUM_BLOCKS+1, block_store_get_used_blocks(bs));
+    ASSERT_EQ(BLOCK_STORE_NUM_BLOCKS - 1 - BITMAP_NUM_BLOCKS, block_store_get_free_blocks(bs));
 
     // request a different arbitrary block, and used and free should update accordingly.
     block_store_request(bs, 50);
-    ASSERT_EQ(3, block_store_get_used_blocks(bs));
-    ASSERT_EQ(BLOCK_STORE_NUM_BLOCKS - 3, block_store_get_free_blocks(bs));
+    ASSERT_EQ(BITMAP_NUM_BLOCKS+2, block_store_get_used_blocks(bs));
+    ASSERT_EQ(BLOCK_STORE_NUM_BLOCKS - 2 - BITMAP_NUM_BLOCKS, block_store_get_free_blocks(bs));
 
     block_store_destroy(bs);
     score += 5;
