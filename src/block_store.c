@@ -68,10 +68,10 @@ size_t block_store_allocate(block_store_t *const bs)
 
 bool block_store_request(block_store_t *const bs, const size_t block_id)
 {
-    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS)     // If the block_store is invalid or the id is bigger than the max size
+    if(bs == NULL || block_id > block_store_get_total_blocks()) // If the block_store is invalid or the id is bigger than the max size
         return false;
 
-    if(bitmap_test(((block_store*)bs)->bitmap, block_id))   // If the index block_id has been set in the bitmap (already allocated)
+    if(bitmap_test(((block_store*)bs)->bitmap, block_id))       // If the index block_id has been set in the bitmap (already allocated)
         return false;
     
     bitmap_set(((block_store*)bs)->bitmap, block_id);                       // Set the block_id bitmap
@@ -80,7 +80,7 @@ bool block_store_request(block_store_t *const bs, const size_t block_id)
 
 void block_store_release(block_store_t *const bs, const size_t block_id)
 {
-    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS)
+    if(bs == NULL || block_id > block_store_get_total_blocks())
         return;
     
     bitmap_reset(((block_store*)bs)->bitmap, block_id);
@@ -99,7 +99,7 @@ size_t block_store_get_free_blocks(const block_store_t *const bs)
     if(bs == NULL)
         return SIZE_MAX;
     
-    return BLOCK_STORE_NUM_BLOCKS - bitmap_total_set(((block_store*)bs)->bitmap);
+    return block_store_get_total_blocks() - bitmap_total_set(((block_store*)bs)->bitmap);
 }
 
 size_t block_store_get_total_blocks()
@@ -109,48 +109,63 @@ size_t block_store_get_total_blocks()
 
 size_t block_store_read(const block_store_t *const bs, const size_t block_id, void *buffer)
 {
-    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS || buffer == NULL)   // If the parameters are invalid
+    if(bs == NULL || block_id > block_store_get_total_blocks() || buffer == NULL)   // If the parameters are invalid
         return 0;
 
-    if(!bitmap_test(((block_store*)bs)->bitmap, block_id))                  // If the block has not already been allocated
+    if(!bitmap_test(((block_store*)bs)->bitmap, block_id))                          // If the block has not already been allocated
         return 0;
 
-    for(size_t i = 0; i < BLOCK_SIZE_BYTES; i++)                            // Iterate over all bytes at the index block_id
-        ((char*)buffer)[i] = ((block_store*)bs)->data[block_id][i];         // Copy the data from the bs->data to the buffer
+    for(size_t i = 0; i < BLOCK_SIZE_BYTES; i++)                                    // Iterate over all bytes at the index block_id
+        ((char*)buffer)[i] = ((block_store*)bs)->data[block_id][i];                 // Copy the data from the bs->data to the buffer
 
-    return BLOCK_SIZE_BYTES;                                                // Return the number of bytes copied
+    return BLOCK_SIZE_BYTES;                                                        // Return the number of bytes copied
 }
 
 size_t block_store_write(block_store_t *const bs, const size_t block_id, const void *buffer)
 {
-    if(bs == NULL || block_id > BLOCK_STORE_NUM_BLOCKS || buffer == NULL)   // If the parameters are invalid
+    if(bs == NULL || block_id > block_store_get_total_blocks() || buffer == NULL)   // If the parameters are invalid
         return 0;
     
-    if(!bitmap_test(((block_store*)bs)->bitmap, block_id))                  // If the block has not already been allocated
+    if(!bitmap_test(((block_store*)bs)->bitmap, block_id))                          // If the block has not already been allocated
         return 0;
 
-    for(size_t i = 0; i < BLOCK_SIZE_BYTES; i++)                            // Iterate over the maxiumum number of bytes that can be stored in bs->data
-        ((block_store*)bs)->data[block_id][i] = ((char*)buffer)[i];         // Copy the data from buffer to bs->data
+    for(size_t i = 0; i < BLOCK_SIZE_BYTES; i++)                                    // Iterate over the maxiumum number of bytes that can be stored in bs->data
+        ((block_store*)bs)->data[block_id][i] = ((char*)buffer)[i];                 // Copy the data from buffer to bs->data
     
 
-    return BLOCK_SIZE_BYTES;                                                // Return the number of bytes copied
+    return BLOCK_SIZE_BYTES;                                                        // Return the number of bytes copied
 }
 
 block_store_t *block_store_deserialize(const char *const filename)
 {  
-    if(filename == NULL)
+    if(filename == NULL)                        // If the filename is NULL
         return NULL;
 
-    UNUSED(filename);
-    return NULL;
+    FILE * file = fopen(filename, "rb");        // Open the file to read the bytes
+    if(file == NULL)                            // If the file is unable to be opened
+        return NULL;
+    
+    block_store *bs = (block_store*)block_store_create();   // Create a new block_store
+    if(bs == NULL)                                          // If the block_store is unable to be created
+        return NULL;
+    
+
+    fread(bs->data, sizeof(char), sizeof(bs->data), file);  // Read the data from the file and place it in bs->data
+    fclose(file);                                           // Close the file
+
+    return (block_store_t*)bs;          // Return the pointer to the deserialized data
 }
 
 size_t block_store_serialize(const block_store_t *const bs, const char *const filename)
 {
-    if(bs == NULL || filename == NULL)
+    if(bs == NULL || filename == NULL)  // If the bs or filename is invalid
+        return 0;
+    
+    FILE *file = fopen(filename, "wb"); // Attempt to open the file to write the bytes
+    if(file == NULL)                    // If the file is unable to be opened
         return 0;
 
-    UNUSED(bs);
-    UNUSED(filename);
-    return 0;
+    fwrite(((block_store*)bs)->data, sizeof(char), sizeof(((block_store*)bs)->data), file); // Write bs->data to the file
+    fclose(file);                                                                           // Close the file
+    return sizeof(((block_store*)bs)->data);                                                // Return the size of the bs->data array
 }
